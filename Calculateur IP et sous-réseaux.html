@@ -1,0 +1,188 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Calculateur IP, masque et sous-réseaux</title>
+<style>
+:root{--bg:#f6f7f9;--card:#fff;--tx:#1b1f24;--mut:#6a727c;--bd:#d9dde3;--ac:#2563eb;--net:#2563eb;--host:#d97706;--err:#dc2626;--ok:#16a34a;
+box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#111418;--card:#1a1f26;--tx:#e8ebef;--mut:#98a1ac;--bd:#2c343e;--ac:#60a5fa;--net:#60a5fa;--host:#fbbf24;--err:#f87171;--ok:#4ade80}}
+:root[data-theme="dark"]{--bg:#111418;--card:#1a1f26;--tx:#e8ebef;--mut:#98a1ac;--bd:#2c343e;--ac:#60a5fa;--net:#60a5fa;--host:#fbbf24;--err:#f87171;--ok:#4ade80}
+html{scroll-padding-top:env(safe-area-inset-top,0px)}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--tx);font:16px/1.5 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
+main{max-width:980px;margin:0 auto;padding:20px 16px 48px}
+h1{font-size:1.5rem;margin:0 0 4px}h2{font-size:1.1rem;margin:0 0 12px}
+p.sub{color:var(--mut);margin:0 0 20px}
+.card{background:var(--card);border:1px solid var(--bd);border-radius:12px;padding:16px;margin-bottom:16px}
+label{display:block;font-size:.85rem;color:var(--mut);margin-bottom:4px}
+input[type=text],input[type=number]{width:100%;padding:9px 11px;border:1px solid var(--bd);border-radius:8px;background:var(--bg);color:var(--tx);font:inherit;font-family:ui-monospace,Menlo,Consolas,monospace}
+input:focus{outline:2px solid var(--ac);border-color:transparent}
+input.bad{border-color:var(--err)}
+.row{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:12px;align-items:end}
+.mono{font-family:ui-monospace,Menlo,Consolas,monospace}
+.bin{font-size:1.15rem;letter-spacing:.5px;word-break:break-all}
+.bin .o{display:inline-block;margin-right:.7em}
+.net{color:var(--net);font-weight:600}.host{color:var(--host)}
+.leg{font-size:.8rem;color:var(--mut);margin-top:6px}
+.leg b{font-weight:600}
+.msg{color:var(--err);font-size:.9rem;min-height:1.2em;margin-top:4px}
+.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:8px 24px}
+.kv{display:flex;flex-direction:column;border-bottom:1px solid var(--bd);padding:6px 0}
+.kv span{font-size:.8rem;color:var(--mut)}
+.kv div{font-family:ui-monospace,Menlo,Consolas,monospace;word-break:break-all}
+.chk{display:flex;align-items:center;gap:8px;margin-bottom:12px;font-size:1rem;color:var(--tx);cursor:pointer}
+.chk input{width:18px;height:18px}
+.scroll{overflow-x:auto}
+table{border-collapse:collapse;width:100%;font-size:.9rem;min-width:720px}
+th,td{text-align:left;padding:7px 9px;border-bottom:1px solid var(--bd);white-space:nowrap}
+th{color:var(--mut);font-weight:600;font-size:.8rem}
+td.m{font-family:ui-monospace,Menlo,Consolas,monospace}
+button{font:inherit;padding:8px 14px;border-radius:8px;border:1px solid var(--bd);background:var(--bg);color:var(--tx);cursor:pointer}
+button.p{background:var(--ac);border-color:var(--ac);color:#fff}
+button.x{padding:6px 10px;color:var(--err)}
+.vrow{display:grid;grid-template-columns:1fr 140px auto;gap:8px;margin-bottom:8px;align-items:center}
+.ok{color:var(--ok)}.err{color:var(--err)}
+.hidden{display:none}
+</style>
+</head>
+<body>
+<main>
+<h1>Calculateur IP et sous-réseaux</h1>
+<p class="sub">Saisissez une adresse IPv4 : tout est calculé en temps réel, dans votre navigateur.</p>
+
+<section class="card">
+  <h2>1. Adresse IP</h2>
+  <label for="ip">Adresse IPv4</label>
+  <input id="ip" type="text" inputmode="decimal" value="192.168.1.10" autocomplete="off" spellcheck="false">
+  <div class="msg" id="ipmsg"></div>
+  <div style="margin-top:10px"><label>Conversion binaire (par octet)</label>
+  <div class="bin mono" id="ipbin"></div></div>
+</section>
+
+<section class="card">
+  <label class="chk"><input type="checkbox" id="usemask" checked> Ajouter un masque réseau</label>
+  <div id="maskbox">
+    <div class="row">
+      <div><label for="pref">Préfixe CIDR (/0 à /32)</label>
+        <input id="pref" type="number" min="0" max="32" value="24"></div>
+      <div><label for="mask">Masque décimal pointé</label>
+        <input id="mask" type="text" value="255.255.255.0" autocomplete="off" spellcheck="false"></div>
+    </div>
+    <input id="slider" type="range" min="0" max="32" value="24" style="width:100%;margin-top:12px" aria-label="Préfixe">
+    <div class="msg" id="maskmsg"></div>
+    <div style="margin-top:6px"><label>Masque en binaire</label>
+    <div class="bin mono" id="maskbin"></div></div>
+  </div>
+</section>
+
+<section class="card hidden" id="resbox">
+  <h2>2. Réseau calculé</h2>
+  <label>Adresse IP avec séparation réseau / hôte</label>
+  <div class="bin mono" id="ipsplit"></div>
+  <div class="leg"><span class="net">Bits réseau</span> · <span class="host">Bits hôte</span></div>
+  <div class="grid" id="info" style="margin-top:14px"></div>
+</section>
+
+<section class="card hidden" id="vlsmbox">
+  <h2>3. Sous-réseaux selon le nombre de machines</h2>
+  <p class="sub" style="margin-bottom:12px">Indiquez le nombre de machines par sous-réseau : l’allocation se fait en VLSM, du plus grand au plus petit, à l’intérieur du réseau ci-dessus (adresses réseau et broadcast comprises).</p>
+  <div id="vrows"></div>
+  <button id="add" class="p">+ Ajouter un sous-réseau</button>
+  <div class="msg" id="vmsg" style="margin-top:12px"></div>
+  <div class="scroll"><table id="vtab"></table></div>
+</section>
+</main>
+
+<script>
+const $=id=>document.getElementById(id);
+const parseIP=s=>{const m=/^\s*(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})\s*$/.exec(s);if(!m)return null;const o=m.slice(1).map(Number);if(o.some(x=>x>255))return null;return((o[0]*256+o[1])*256+o[2])*256+o[3]};
+const toStr=n=>[Math.floor(n/16777216)%256,Math.floor(n/65536)%256,Math.floor(n/256)%256,n%256].join('.');
+const maskOf=p=>p===0?0:(0xFFFFFFFF<<(32-p))>>>0;
+const bits=n=>(n>>>0).toString(2).padStart(32,'0');
+function binHTML(n,p){const b=bits(n);let h='';for(let o=0;o<4;o++){h+='<span class="o">';for(let i=o*8;i<o*8+8;i++){h+=p<0?b[i]:`<span class="${i<p?'net':'host'}">${b[i]}</span>`}h+='</span>'}return h}
+function maskToPrefix(s){const n=parseIP(s);if(n===null)return null;const b=bits(n);if(!/^1*0*$/.test(b))return null;return b.indexOf('0')<0?32:b.indexOf('0')}
+function usable(p,net){const size=Math.pow(2,32-p),bc=net+size-1;
+  if(p<=30)return{first:net+1,last:bc-1,hosts:size-2,bc};
+  if(p===31)return{first:net,last:bc,hosts:2,bc};
+  return{first:net,last:net,hosts:1,bc}}
+function ipClass(n){const a=n>>>24;return a<128?'A':a<192?'B':a<224?'C':a<240?'D (multicast)':'E (réservée)'}
+function ipType(n){const a=n>>>24,b=(n>>>16)&255;
+  if(a===10||(a===172&&b>=16&&b<=31)||(a===192&&b===168))return'Privée (RFC 1918)';
+  if(a===127)return'Loopback';if(a===169&&b===254)return'APIPA (link-local)';return'Publique'}
+
+let rows=[{name:'LAN A',hosts:50},{name:'LAN B',hosts:20},{name:'LAN C',hosts:10}];
+let ctx=null; // {net,p}
+
+function buildRows(){
+  $('vrows').innerHTML=rows.map((r,i)=>`<div class="vrow">
+    <input type="text" data-i="${i}" data-k="name" value="${r.name.replace(/"/g,'&quot;')}" aria-label="Nom">
+    <input type="number" min="1" data-i="${i}" data-k="hosts" value="${r.hosts}" aria-label="Machines">
+    <button class="x" data-del="${i}" title="Supprimer">✕</button></div>`).join('');
+}
+
+function update(){
+  const ipn=parseIP($('ip').value);
+  $('ip').classList.toggle('bad',ipn===null&&$('ip').value!=='');
+  $('ipmsg').textContent=ipn===null?'Adresse invalide : format attendu x.x.x.x avec x entre 0 et 255.':'';
+  $('ipbin').innerHTML=ipn===null?'—':binHTML(ipn,-1);
+  const use=$('usemask').checked;
+  $('maskbox').classList.toggle('hidden',!use);
+  const p=+$('pref').value;
+  if(ipn===null||!use){$('resbox').classList.add('hidden');$('vlsmbox').classList.add('hidden');ctx=null;return}
+  $('maskbin').innerHTML=binHTML(maskOf(p),p);
+  const m=maskOf(p),net=(ipn&m)>>>0,u=usable(p,net),wild=(~m)>>>0;
+  $('ipsplit').innerHTML=binHTML(ipn,p);
+  const kv=(k,v)=>`<div class="kv"><span>${k}</span><div>${v}</div></div>`;
+  $('info').innerHTML=kv('Adresse IP',toStr(ipn)+'/'+p)+kv('Masque',toStr(m))+kv('Masque inverse (wildcard)',toStr(wild))
+    +kv('Adresse réseau',toStr(net)+'/'+p)+kv('Réseau (binaire)',bits(net).replace(/(.{8})(?=.)/g,'$1.'))
+    +kv('Adresse de broadcast',toStr(u.bc))+kv('Première machine',toStr(u.first))+kv('Dernière machine',toStr(u.last))
+    +kv('Machines utilisables',u.hosts.toLocaleString('fr-FR'))+kv('Adresses totales',Math.pow(2,32-p).toLocaleString('fr-FR'))
+    +kv('Classe',ipClass(ipn))+kv('Type',ipType(ipn));
+  $('resbox').classList.remove('hidden');$('vlsmbox').classList.remove('hidden');
+  ctx={net,p};vlsm();
+}
+
+function vlsm(){
+  if(!ctx)return;
+  const {net,p}=ctx,end=net+Math.pow(2,32-p);
+  const list=rows.map((r,i)=>({name:r.name||('Sous-réseau '+(i+1)),h:Math.max(1,Math.floor(+r.hosts)||0)}))
+    .sort((a,b)=>b.h-a.h);
+  let cur=net,html='<tr><th>Nom</th><th>Machines</th><th>Réseau</th><th>Masque</th><th>Plage utilisable</th><th>Broadcast</th><th>Libres</th></tr>',errs=[];
+  for(const s of list){
+    const hb=Math.max(2,Math.ceil(Math.log2(s.h+2))),sp=32-hb,size=Math.pow(2,hb);
+    cur=Math.ceil(cur/size)*size;
+    if(sp<p||cur+size>end){errs.push(`« ${s.name} » (${s.h} machines) ne rentre pas dans ${toStr(net)}/${p}.`);continue}
+    const u=usable(sp,cur);
+    html+=`<tr><td>${s.name.replace(/</g,'&lt;')}</td><td class="m">${s.h}</td><td class="m">${toStr(cur)}/${sp}</td><td class="m">${toStr(maskOf(sp))}</td><td class="m">${toStr(u.first)} – ${toStr(u.last)}</td><td class="m">${toStr(u.bc)}</td><td class="m">${u.hosts-s.h}</td></tr>`;
+    cur+=size;
+  }
+  $('vtab').innerHTML=html;
+  const left=end-cur;
+  $('vmsg').innerHTML=errs.length?'<span class="err">'+errs.join('<br>')+'</span>':`<span class="ok">Allocation réussie.</span> Il reste ${Math.max(0,left).toLocaleString('fr-FR')} adresses libres${left>0?' à partir de '+toStr(cur):''}.`;
+}
+
+function setPrefix(p,from){
+  p=Math.min(32,Math.max(0,p|0));
+  if(from!=='pref')$('pref').value=p;
+  $('slider').value=p;
+  if(from!=='mask')$('mask').value=toStr(maskOf(p));
+  $('mask').classList.remove('bad');$('maskmsg').textContent='';
+  update();
+}
+$('ip').addEventListener('input',update);
+$('usemask').addEventListener('change',update);
+$('pref').addEventListener('input',e=>{const v=e.target.value;if(v===''||isNaN(+v))return;setPrefix(+v,'pref')});
+$('slider').addEventListener('input',e=>setPrefix(+e.target.value,'slider'));
+$('mask').addEventListener('input',e=>{
+  const p=maskToPrefix(e.target.value);
+  if(p===null){e.target.classList.add('bad');$('maskmsg').textContent='Masque invalide : il doit être une suite de 1 puis de 0 (ex. 255.255.240.0).';return}
+  setPrefix(p,'mask')});
+$('vrows').addEventListener('input',e=>{const t=e.target,i=+t.dataset.i;if(isNaN(i))return;rows[i][t.dataset.k]=t.dataset.k==='hosts'?+t.value:t.value;vlsm()});
+$('vrows').addEventListener('click',e=>{const d=e.target.dataset.del;if(d===undefined)return;rows.splice(+d,1);buildRows();vlsm()});
+$('add').addEventListener('click',()=>{rows.push({name:'LAN '+String.fromCharCode(65+rows.length%26),hosts:10});buildRows();vlsm()});
+buildRows();update();
+</script>
+</body>
+</html>
